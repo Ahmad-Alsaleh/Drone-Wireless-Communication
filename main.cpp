@@ -60,15 +60,15 @@ void transmit_image_chunk(u32 chunk_sequence_number, u8 image_bytes[],
                           u32 chunk_len) {
   // NOTE: chunk_sequence_number is now u32 (int) as opposed to u16 (short) in
   // Adham's implementation
-  debug("[DEBUG] transmiting image #%d (%d bytes)...\n", chunk_sequence_number,
-        chunk_len);
+  debug("[DEBUG] transmiting image chunk #%d (%d bytes)...\n",
+        chunk_sequence_number, chunk_len);
 
-  u8 buffer[sizeof(chunk_sequence_number) + CHUNK_SIZE];
+  u8 buffer[4 + CHUNK_SIZE];
   size_t buffer_i = 0;
 
-  chunk_sequence_number = htonl(chunk_sequence_number);
-  memcpy(buffer + buffer_i, &chunk_sequence_number,
-         sizeof(chunk_sequence_number));
+  // TODO: give `seq` a better name
+  u32 seq_num_big_endian = htonl(chunk_sequence_number);
+  memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_sequence_number));
   buffer_i += sizeof(chunk_sequence_number);
 
   memcpy(buffer + buffer_i, image_bytes + chunk_sequence_number * chunk_len,
