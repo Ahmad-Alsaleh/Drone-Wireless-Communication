@@ -22,7 +22,7 @@ const u32 IMAGE_HEIGHT = 0x1A2B3C4D;
 void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   debug("[DEBUG] transmiting header...\n");
   u8 buffer[36];
-  u8 buffer_i = 0;
+  size_t buffer_i = 0;
 
   const char *prefix = "AT+TEST=TXLRPKT, \"LORA";
   memcpy(buffer + buffer_i, prefix, strlen(prefix));
@@ -47,8 +47,8 @@ void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   Serial.write(buffer, buffer_i);
 
 #ifdef DEBUG
-  for (int i = 0; i < buffer_i; ++i)
-    debug("==> [%02d] %c\t0x%02X\n", i, buffer[i], buffer[i]);
+  for (size_t i = 0; i < buffer_i; ++i)
+    debug("==> [%02lu] %c\t0x%02X\n", i, buffer[i], buffer[i]);
 #endif
 
   // NOTE: Adham transmitts the body as hex and UTF-8 encodes the whole buffer
@@ -62,11 +62,20 @@ void transmit_image_chunk(u32 chunk_sequence_number, u8 image_bytes[],
   // Adham's implementation
   debug("[DEBUG] transmiting image #%d (%d bytes)...\n", chunk_sequence_number,
         chunk_len);
-  u8 buffer[2 + CHUNK_SIZE];
-  write_u16(buffer, chunk_sequence_number);
-  memcpy(buffer + 2, image_bytes + chunk_sequence_number * chunk_len,
+
+  u8 buffer[sizeof(chunk_sequence_number) + CHUNK_SIZE];
+  size_t buffer_i = 0;
+
+  chunk_sequence_number = htonl(chunk_sequence_number);
+  memcpy(buffer + buffer_i, &chunk_sequence_number,
+         sizeof(chunk_sequence_number));
+  buffer_i += sizeof(chunk_sequence_number);
+
+  memcpy(buffer + buffer_i, image_bytes + chunk_sequence_number * chunk_len,
          chunk_len);
-  Serial.write(buffer, chunk_len);
+  buffer_i += chunk_len;
+
+  Serial.write(buffer, buffer_i);
 }
 
 void transmit_image_chunks(u8 image_bytes[], u32 n_chunks) {
@@ -95,6 +104,7 @@ void setup() {
 
   u32 n_bytes_to_send = n_image_bytes + 2 * n_chunks;
 
+  // TODO: Adham send the header 3 times. Should I do that as well?
   transmit_header(n_bytes_to_send, IMAGE_WIDTH, IMAGE_HEIGHT);
   transmit_image_chunks(image_bytes, n_chunks);
 

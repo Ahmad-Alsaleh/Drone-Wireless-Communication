@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -pedantic
 
 # Source and object files
 SRC = main.cpp utils.cpp
