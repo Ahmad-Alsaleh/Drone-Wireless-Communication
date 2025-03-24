@@ -10,6 +10,7 @@ typedef uint32_t u32;
 
 class SerialClass {
 public:
+  void begin(unsigned long baud);
   void write(const u8 *bytes, size_t length);
   void print(const char *msg);
   void println(const char *msg);

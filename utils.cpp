@@ -6,6 +6,10 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+void SerialClass::begin(unsigned long baud) {
+  printf("Starting Serial (%ld)\n", baud);
+}
+
 void SerialClass::write(const u8 *bytes, size_t length) {
   for (size_t i = 0; i < length; ++i)
     printf("%02X ", bytes[i]);
