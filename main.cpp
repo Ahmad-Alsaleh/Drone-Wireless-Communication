@@ -1,13 +1,13 @@
-// #define ARDUINO
+#define DEBUG
 
+#ifdef DEBUG
+#define debug(...) fprintf(stderr, __VA_ARGS__)
 #include <cstdio>
 #include <cstring>
-#ifdef ARDUINO
-#include <Arduino.h>
-#else
-#define debug(...) fprintf(stderr, __VA_ARGS__)
 #include <stdio.h>
 #include <string.h>
+#else
+#include <Arduino.h>
 #endif
 
 #include "utils.h"
@@ -38,6 +38,11 @@ void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   write_u32(buffer + 25, image_width);
   write_u32(buffer + 29, image_height);
   Serial.write(buffer, 33);
+#ifdef DEBUG
+  for (int i = 0; i < 34; ++i)
+    debug("%c", buffer[i]);
+  debug("\n");
+#endif
 }
 
 void transmit_image_chunk(u16 chunk_sequence_number, u8 *image_bytes,
