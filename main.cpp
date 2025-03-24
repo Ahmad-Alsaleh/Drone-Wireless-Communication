@@ -1,3 +1,4 @@
+#include <sys/_endian.h>
 #define DEBUG
 
 #ifdef DEBUG
@@ -18,31 +19,51 @@
 // is very doable.
 
 const u32 CHUNK_SIZE = 200;
-const u32 IMAGE_WIDTH = 16909060;
-const u32 IMAGE_HEIGHT = 203569230;
+// const u32 IMAGE_WIDTH = 16909060;
+const u32 IMAGE_WIDTH = 0x12345678;
+// const u32 IMAGE_HEIGHT = 203569230;
+const u32 IMAGE_HEIGHT = 0x1A2B3C4D;
 #define AT_COMMAND "AT+TEST=TXLRPKT, "
 
 SerialClass Serial;
 
 void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   debug("[DEBUG] transmiting header...\n");
-  u8 buffer[33];
-  memcpy(buffer, AT_COMMAND, 17);
+  u8 buffer[36];
+  u8 buffer_i = 0;
+
+  const char *prefix = "AT+TEST=TXLRPKT, \"LORA";
+  memcpy(buffer + buffer_i, prefix, strlen(prefix));
+  buffer_i += strlen(prefix);
+
+  n_bytes_to_send = htonl(n_bytes_to_send);
+  memcpy(buffer + buffer_i, &n_bytes_to_send, sizeof(n_bytes_to_send));
+  buffer_i += sizeof(n_bytes_to_send);
+
+  image_width = htonl(image_width);
+  memcpy(buffer + buffer_i, &image_width, sizeof(image_width));
+  buffer_i += sizeof(image_width);
+
+  image_height = htonl(image_height);
+  memcpy(buffer + buffer_i, &image_height, sizeof(image_height));
+  buffer_i += sizeof(image_height);
+
+  const char *suffex = "\"\n";
+  memcpy(buffer + buffer_i, suffex, strlen(suffex));
+  buffer_i += strlen(suffex);
+
+  Serial.write(buffer, buffer_i);
+
+#ifdef DEBUG
+  for (int i = 0; i < buffer_i; ++i)
+    debug("==> [%02d] %c\t0x%02X\n", i, buffer[i], buffer[i]);
+#endif
+
   // NOTE: Adham transmitts the body as hex and encodes the whole buffer before
   // sending it. I don't think i need to do this. but it is better to do
   // integration testing with the server code. Adham also tarminates the buffer
   // with '\n'. Also double check if this is needed or maybe Serial.write does
   // that for me.
-  memcpy(buffer + 17, "LORA", 4);
-  write_u32(buffer + 21, n_bytes_to_send);
-  write_u32(buffer + 25, image_width);
-  write_u32(buffer + 29, image_height);
-  Serial.write(buffer, 33);
-#ifdef DEBUG
-  for (int i = 0; i < 34; ++i)
-    debug("%c", buffer[i]);
-  debug("\n");
-#endif
 }
 
 void transmit_image_chunk(u16 chunk_sequence_number, u8 *image_bytes,
