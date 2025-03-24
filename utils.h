@@ -2,22 +2,10 @@
 #define UTILS
 
 #include <stdint.h>
-#include <stdio.h>
 
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
-
-class SerialClass {
-public:
-  void begin(unsigned long baud);
-  void write(const u8 *bytes, size_t length);
-  void print(const char *msg);
-  void println(const char *msg);
-};
-
-void write_u32(u8 *buffer, u32 value);
-void write_u16(u8 *buffer, u16 value);
 
 static u32 n_image_bytes = 764;
 static u8 image_bytes[] = {

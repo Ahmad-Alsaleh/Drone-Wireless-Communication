@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -Wall -Wextra -g -pedantic
 
 # Source and object files
-SRC = main.cpp utils.cpp
+SRC = main.cpp
 OBJ = $(SRC:.cpp=.o)
 
 # Output executable

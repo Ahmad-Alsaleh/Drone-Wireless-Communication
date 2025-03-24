@@ -6,16 +6,33 @@
 #define debug(...) fprintf(stderr, __VA_ARGS__)
 #include <cstdio>
 #include <cstring>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/_endian.h>
-SerialClass Serial;
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+
+class SerialClass {
+public:
+  void begin(unsigned long baud) { printf("Starting Serial (%ld)\n", baud); }
+  void write(const u8 *bytes, size_t length) {
+    for (size_t i = 0; i < length; ++i)
+      printf("%02X ", bytes[i]);
+    printf("\n");
+  }
+  void print(const char *msg) { printf("%s", msg); }
+  void println(const char *msg) { printf("%s\n", msg); }
+} Serial;
+
 #else
 #include <Arduino.h> // TODO: remove this
 #define debug(...)
 #endif
 
-const u32 CHUNK_SIZE = 200;
+const u32 CHUNK_SIZE = 200; // no need for u32, maybe use #define
 const u32 IMAGE_WIDTH = 0x12345678;
 const u32 IMAGE_HEIGHT = 0x1A2B3C4D;
 
@@ -66,7 +83,6 @@ void transmit_image_chunk(u32 chunk_sequence_number, u8 image_bytes[],
   u8 buffer[4 + CHUNK_SIZE];
   size_t buffer_i = 0;
 
-  // TODO: give `seq` a better name
   u32 seq_num_big_endian = htonl(chunk_sequence_number);
   memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_sequence_number));
   buffer_i += sizeof(chunk_sequence_number);
