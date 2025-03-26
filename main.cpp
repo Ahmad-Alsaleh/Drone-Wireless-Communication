@@ -73,21 +73,20 @@ void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   // integration testing with the server code.
 }
 
-void transmit_image_chunk(u32 chunk_sequence_number, u8 image_bytes[],
-                          u32 chunk_len) {
-  // NOTE: chunk_sequence_number is now u32 (int) as opposed to u16 (short) in
-  // Adham's implementation
-  debug("[DEBUG] transmiting image chunk #%d (%d bytes)...\n",
-        chunk_sequence_number, chunk_len);
+void transmit_image_chunk(u32 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
+  // TODO: chunk_sequence_number is now u32 (int) as opposed to u16 (short) in
+  // Adham's implementation. Fix it
+  debug("[DEBUG] transmiting image chunk #%d (%d bytes)...\n", chunk_seq_num,
+        chunk_len);
 
   u8 buffer[4 + CHUNK_SIZE];
   size_t buffer_i = 0;
 
-  u32 seq_num_big_endian = htonl(chunk_sequence_number);
-  memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_sequence_number));
-  buffer_i += sizeof(chunk_sequence_number);
+  u32 seq_num_big_endian = htonl(chunk_seq_num);
+  memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_seq_num));
+  buffer_i += sizeof(chunk_seq_num);
 
-  memcpy(buffer + buffer_i, image_bytes + chunk_sequence_number * chunk_len,
+  memcpy(buffer + buffer_i, image_bytes + chunk_seq_num * CHUNK_SIZE,
          chunk_len);
   buffer_i += chunk_len;
 
