@@ -20,7 +20,7 @@ public:
   void begin(unsigned long baud) { printf("Starting Serial (%ld)\n", baud); }
   void write(const u8 *bytes, size_t length) {
     for (size_t i = 0; i < length; ++i)
-      printf("%02X ", bytes[i]);
+      printf("%02x ", bytes[i]);
     printf("\n");
   }
   void print(const char *msg) { printf("%s", msg); }
@@ -33,9 +33,11 @@ public:
 #endif
 
 const u32 CHUNK_SIZE = 200; // no need for u32, maybe use #define
-const u32 IMAGE_WIDTH = 0x12345678;
-const u32 IMAGE_HEIGHT = 0x1A2B3C4D;
+const u32 IMAGE_WIDTH = 10;
+const u32 IMAGE_HEIGHT = 7;
 
+// TODO: Adham sends the header as a prefix to the 1st chunk.
+// However, I send it as a separate chunk to simplyfy the code.
 void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   debug("[DEBUG] transmiting header...\n");
   u8 buffer[36];
@@ -72,8 +74,12 @@ void transmit_image_chunk(u16 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
   debug("[DEBUG] transmiting image chunk #%d (%d bytes)...\n", chunk_seq_num,
         chunk_len);
 
-  u8 buffer[4 + CHUNK_SIZE];
+  u8 buffer[22 + CHUNK_SIZE];
   size_t buffer_i = 0;
+
+  const char *prefix = "AT+TEST=TXLRPKT, \"";
+  memcpy(buffer + buffer_i, prefix, strlen(prefix));
+  buffer_i += strlen(prefix);
 
   u16 seq_num_big_endian = htonl(chunk_seq_num);
   memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_seq_num));
@@ -82,6 +88,10 @@ void transmit_image_chunk(u16 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
   memcpy(buffer + buffer_i, image_bytes + chunk_seq_num * CHUNK_SIZE,
          chunk_len);
   buffer_i += chunk_len;
+
+  const char *suffex = "\"\n";
+  memcpy(buffer + buffer_i, suffex, strlen(suffex));
+  buffer_i += strlen(suffex);
 
   Serial.write(buffer, buffer_i);
 }
