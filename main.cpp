@@ -63,26 +63,19 @@ void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
 
   Serial.write(buffer, buffer_i);
 
-#ifdef DEBUG
-  for (size_t i = 0; i < buffer_i; ++i)
-    debug("==> [%02lu] %c\t0x%02X\n", i, buffer[i], buffer[i]);
-#endif
-
   // NOTE: Adham transmitts the body as hex and UTF-8 encodes the whole buffer
   // before sending it. I don't think i need to do this. but it is better to do
   // integration testing with the server code.
 }
 
-void transmit_image_chunk(u32 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
-  // TODO: chunk_sequence_number is now u32 (int) as opposed to u16 (short) in
-  // Adham's implementation. Fix it
+void transmit_image_chunk(u16 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
   debug("[DEBUG] transmiting image chunk #%d (%d bytes)...\n", chunk_seq_num,
         chunk_len);
 
   u8 buffer[4 + CHUNK_SIZE];
   size_t buffer_i = 0;
 
-  u32 seq_num_big_endian = htonl(chunk_seq_num);
+  u16 seq_num_big_endian = htonl(chunk_seq_num);
   memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_seq_num));
   buffer_i += sizeof(chunk_seq_num);
 
@@ -93,10 +86,10 @@ void transmit_image_chunk(u32 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
   Serial.write(buffer, buffer_i);
 }
 
-void transmit_image_chunks(u8 image_bytes[], u32 n_chunks) {
+void transmit_image_chunks(u8 image_bytes[], u16 n_chunks) {
   // transmit all chunks except the last one since it might have fewer bytes
   // than the other chunks
-  for (u32 chunk_i = 0; chunk_i < n_chunks - 1; ++chunk_i)
+  for (u16 chunk_i = 0; chunk_i < n_chunks - 1; ++chunk_i)
     transmit_image_chunk(chunk_i, image_bytes, CHUNK_SIZE);
   // transmit the last chunk
   transmit_image_chunk(n_chunks - 1, image_bytes,
@@ -112,7 +105,7 @@ void setup() {
   Serial.begin(115200);
 
   // manually implement the ceil function
-  u32 n_chunks = n_image_bytes / CHUNK_SIZE;
+  u16 n_chunks = n_image_bytes / CHUNK_SIZE;
   if (n_image_bytes != n_chunks * CHUNK_SIZE) {
     ++n_chunks;
   }
