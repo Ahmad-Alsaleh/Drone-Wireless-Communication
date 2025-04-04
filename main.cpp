@@ -17,11 +17,11 @@ typedef uint32_t u32;
 
 class SerialClass {
 public:
-  void begin(unsigned long baud) { printf("Starting Serial (%ld)\n", baud); }
+  void begin(unsigned long baud) { debug("Starting Serial (%ld)\n", baud); }
   void write(const u8 *bytes, size_t length) {
-    for (size_t i = 0; i < length; ++i)
+    for (size_t i = 0; i < length - 1; ++i)
       printf("%02x ", bytes[i]);
-    printf("\n");
+    printf("%02x\n", bytes[length - 1]);
   }
   void print(const char *msg) { printf("%s", msg); }
   void println(const char *msg) { printf("%s\n", msg); }
@@ -38,6 +38,8 @@ const u32 IMAGE_HEIGHT = 7;
 
 // TODO: Adham sends the header as a prefix to the 1st chunk.
 // However, I send it as a separate chunk to simplyfy the code.
+// To fix this, make a function called `transmit_first_chunk` and
+// put it inside `transmit_image_chunks`
 void transmit_header(u32 n_bytes_to_send, u32 image_width, u32 image_height) {
   debug("[DEBUG] transmiting header...\n");
   u8 buffer[36];
@@ -81,7 +83,7 @@ void transmit_image_chunk(u16 chunk_seq_num, u8 image_bytes[], u32 chunk_len) {
   memcpy(buffer + buffer_i, prefix, strlen(prefix));
   buffer_i += strlen(prefix);
 
-  u16 seq_num_big_endian = htonl(chunk_seq_num);
+  u16 seq_num_big_endian = htons(chunk_seq_num);
   memcpy(buffer + buffer_i, &seq_num_big_endian, sizeof(chunk_seq_num));
   buffer_i += sizeof(chunk_seq_num);
 
