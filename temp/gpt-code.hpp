@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/_endian.h>
+#include <thread>
+#include <unistd.h>
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -11,7 +13,9 @@ typedef uint32_t u32;
 typedef size_t usize;
 
 usize min(usize a, usize b) { return a < b ? a : b; }
-void delay(u32) {}
+void delay(u32 milliseconds) {
+  std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+}
 
 void *mempcpy(void *dst, const void *src, size_t n) {
   return (char *)memcpy(dst, src, n) + n;
@@ -19,11 +23,11 @@ void *mempcpy(void *dst, const void *src, size_t n) {
 
 class SerialClass {
 public:
-  void begin(unsigned long baud) {}
-  void write(const u8 *bytes, usize length) {
-    SerialClass::write((const char *)bytes, length);
+  void begin(long baud) { printf("[DEBUG] Serial.begin(%lu)", baud); }
+  usize write(const u8 *bytes, usize length) {
+    return SerialClass::write((const char *)bytes, length);
   }
-  void write(const char *bytes, usize length) {
+  usize write(const char *bytes, usize length) {
     for (usize i = 0; i < length; ++i) {
       u8 byte = bytes[i];
       if (byte == '\n')
@@ -40,12 +44,18 @@ public:
         printf("\\x%02x", byte);
     }
     printf("\n");
+
+    return length;
   }
-  // u8 available() { return 1; }
-  u8 readBytesUntil(char terminator, char *buffer, usize length) { return 1; }
-  // char read() { return 'A'; }
-  void print(const char *msg) { printf("%s", msg); }
-  void println(const char *msg) { printf("%s\n", msg); }
+  u8 readBytes(u8 *buffer, usize length) { return 1; }
+  u8 readBytes(char *buffer, usize length) {
+    return readBytes((char *)buffer, length);
+  }
+  u8 readBytesUntil(char terminator, u8 *buffer, usize length) { return 1; }
+  u8 readBytesUntil(char terminator, char *buffer, usize length) {
+    return readBytesUntil(terminator, (char *)buffer, length);
+  }
+  void setTimeout(long time) { printf("[DEBUG] Serial.setTimeout(%lu)", time); }
 } Serial;
 
 void setup();
