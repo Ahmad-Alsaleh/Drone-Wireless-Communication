@@ -47,6 +47,7 @@ public:
 
     return length;
   }
+  // TODO: have these read methods read from a file
   u8 readBytes(u8 *buffer, usize length) { return 1; }
   u8 readBytes(char *buffer, usize length) {
     return readBytes((char *)buffer, length);
@@ -55,7 +56,11 @@ public:
   u8 readBytesUntil(char terminator, char *buffer, usize length) {
     return readBytesUntil(terminator, (char *)buffer, length);
   }
-  void setTimeout(long time) { printf("[DEBUG] Serial.setTimeout(%lu)", time); }
+  int read() { return 1; }
+  int available() { return 1; }
+  void setTimeout(long milliseconds) {
+    printf("[DEBUG] Serial.setTimeout(%lu)", milliseconds);
+  }
 } Serial;
 
 void setup();
