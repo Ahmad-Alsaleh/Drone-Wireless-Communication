@@ -86,8 +86,7 @@ void transmitHeader(u32 n_bytes_to_send) {
   void *cursor = header;
 
   // write "LORA" literal to buffer
-  const char *prefix = "LORA";
-  cursor = mempcpy(cursor, prefix, strlen(prefix));
+  cursor = mempcpy(cursor, "LORA", 4);
 
   // write <N_BYTES_TO_SEND> to buffer
   n_bytes_to_send = htonl(n_bytes_to_send);
