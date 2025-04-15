@@ -17,7 +17,7 @@ This project implements a prototype system for transmitting an image over a LoRa
 
 ## Protocol Design
 
-The image will be chunked into chunks of 200 bytes each (except for the last chunk which might be slightly shorter). Each chunk will be prefixed with a 2-byte sequence number. The first chunk has a sequence of `0` and the last chunk will have a sequence of `NUM_OF_CHUNKS - 1`.
+The image will be chunked into chunks of 200 bytes (except for the last chunk, which might be slightly shorter). Each chunk will be prefixed with a 2-byte sequence number. The first chunk has a sequence of `0`, and the last chunk will have a sequence of `NUM_OF_CHUNKS - 1`.
 
 ### Header
 
@@ -31,11 +31,11 @@ Sent once before data transfer. Format (16 bytes total):
 +--------+----------+-------------+--------------+
 ```
 
-> Note: `DataSize` is `NUM_OF_BYTES_IN_IMAGE + 2 * NUM_OF_CHUNKS` where `2 * NUM_OF_CHUNKS` corresponds to the sequence numbers.
+> Note: `DataSize` is `NUM_OF_BYTES_IN_IMAGE + 2 * NUM_OF_CHUNKS` where `2 * NUM_OF_CHUNKS` corresponds to the sequence numbers of each chunk.
 
 ### Retransmission
 
-Once transmission is done, the LoRa module will be listening for the sequence number of missing chunks and then retransmit those chunks in the following format:
+Once the transmission is done, the LoRa module will listen for the sequence number of missing chunks and then retransmit those chunks in the following format:
 
 ```
 MISS<N><SEQ_1><SEQ_2>...<SEQ_N>
@@ -75,7 +75,7 @@ Note: The project currently avoids including `Arduino.h` when not compiling for 
 - [ ] Replace fake image with actual image loader
 - [ ] Consider refactoring retransmission buffer allocation
 - [ ] Consider repeated header transmissions for reliability
-- [ ] Ensure integration with receiver’s decoding logic (UTF-8 vs raw bytes)
+- [ ] Ensure integration with the receiver’s decoding logic (UTF-8 vs raw bytes)
 - [ ] Port readBytes to simulate real input (e.g. from file)
 
 ---
