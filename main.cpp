@@ -39,7 +39,7 @@ void configLora() {
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
-void discardSerialBytesUnitl(char terminator) {
+void discardSerialBytesUntil(char terminator) {
   while (!Serial.available() || Serial.read() != terminator)
     ;
 }
@@ -63,9 +63,9 @@ void sendPacket(const u8 *data, usize len) {
   Serial.write(data, len);
   Serial.write("\"\n", 2);
 
-  // discard confirmation message recieved from AT commands (two lines)
-  discardSerialBytesUnitl('\n');
-  discardSerialBytesUnitl('\n');
+  // discard confirmation message received from AT commands (two lines)
+  discardSerialBytesUntil('\n');
+  discardSerialBytesUntil('\n');
 
   // NOTE: Adham transmits the body as hex and UTF-8 encodes the whole buffer
   // before sending it. I don't think i need to do this. but it is better to do
@@ -147,21 +147,21 @@ void transmitImageChunks(u16 n_chunks) {
 void retransmitMissedChunks() {
   Serial.setTimeout(RETRANSMISSION_TIMEOUT);
 
-  // enable recieve mode to recieve sequence numbers of missed chunks
+  // enable receive mode to receive sequence numbers of missed chunks
   Serial.write("AT+TEST=RXLRPKT\n", 16);
-  // discard confirmation message recieved from AT commands
-  discardSerialBytesUnitl('\n');
+  // discard confirmation message received from AT commands
+  discardSerialBytesUntil('\n');
 
-  // the AT message recieved has the form:
+  // the AT message received has the form:
   // +TEST: LEN:<LEN>, RSSI:<RSSI>, SNR:<SNR>\r\n
   // +TEST: RX "<PAYLOAD>"\r\n
 
   // we are interested in the payload after the first `"` in the second line.
   // discard the first line and the bytes before the <PAYLOAD>.
-  discardSerialBytesUnitl('\n');
-  discardSerialBytesUnitl('"');
+  discardSerialBytesUntil('\n');
+  discardSerialBytesUntil('"');
 
-  // the payload recieved has the form:
+  // the payload received has the form:
   // `MISS<N_MISSED_CHUNKS><SEQ_1><SEQ_2>...<SEQ_N>`
   // where <N_MISSED_CHUNKS> and <SEQ_i> are 2 bytes each.
 
@@ -179,7 +179,7 @@ void retransmitMissedChunks() {
   // image is at most 15KB which is 15000 / 200 = 75 chunks.
   // Thus 256 bytes should more than enough
 
-  // the recieved payload has `n_missed_chunks` sequence numbers
+  // the received payload has `n_missed_chunks` sequence numbers
   // and each sequence number is 2 bytes.
   u8 *buffer = (u8 *)malloc(2 * n_missed_chunks);
 
@@ -189,7 +189,7 @@ void retransmitMissedChunks() {
   // TODO: understand why we need this delay, and whether it should be inside
   // the loop
 
-  // wating before sending missed chunks
+  // waiting before sending missed chunks
   delay(RX_SWITCH_DELAY);
 
   // retransmit the missed chunks
