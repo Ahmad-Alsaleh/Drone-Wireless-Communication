@@ -31,18 +31,6 @@ const u8 image_data[N_IMAGE_BYTES] = {FAKE_IMAGE};
 #define RETRANSMISSION_TIMEOUT 5000
 #define RX_SWITCH_DELAY 500
 
-void configLora() {
-  debug(">[DEBUG] sending lora configs...\n");
-
-  // TODO: read after every write to discard confirmation msg
-  Serial.write("AT+LOG=QUIET\n", 13);
-  Serial.write("AT+UART=BR, 230400\n", 19);
-  Serial.write("AT+MODE=TEST\n", 13);
-  Serial.write("AT+TEST=RFCFG,868,SF7,250,12,15,14,ON,OFF,OFF\n", 46);
-
-  debug("<[DEBUG] done sending lora configs\n");
-}
-
 // discards bytes in the serial buffer until a terminator.
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
@@ -63,6 +51,24 @@ void discardNSerialBytes(usize length) {
       ;
     Serial.read();
   }
+}
+
+void configLora() {
+  debug(">[DEBUG] sending lora configs...\n");
+
+  Serial.write("AT+LOG=QUIET\n", 13);
+  discardNSerialBytes('\n');
+
+  Serial.write("AT+UART=BR, 230400\n", 19);
+  discardNSerialBytes('\n');
+
+  Serial.write("AT+MODE=TEST\n", 13);
+  discardNSerialBytes('\n');
+
+  Serial.write("AT+TEST=RFCFG,868,SF7,250,12,15,14,ON,OFF,OFF\n", 46);
+  discardNSerialBytes('\n');
+
+  debug("<[DEBUG] done sending lora configs\n");
 }
 
 // writes `AT+TEST=TXLRPKT, "<DATA>"\n` to serial as bytes
