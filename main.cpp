@@ -4,7 +4,7 @@
 #define DEBUG
 
 #ifdef DEBUG
-#define debug(...) fprintf(stderr, __VA_ARGS__)
+#define debug(...) printf(__VA_ARGS__)
 #else
 #define debug(...)
 #endif // DEBUG
@@ -31,13 +31,22 @@ const u8 image_data[N_IMAGE_BYTES] = {FAKE_IMAGE};
 #define RETRANSMISSION_TIMEOUT 5000
 #define RX_SWITCH_DELAY 500
 
+// TODO: strip out this loging using macros
 // discards bytes in the serial buffer until a terminator.
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
 void discardSerialBytesUntil(char terminator) {
-  while (!Serial.available() || Serial.read() != terminator)
-    ;
+  char c;
+  while (true) {
+    if (Serial2.available()) {
+      c = Serial2.read();
+      Serial.print(c);
+      if (c == terminator)
+        break;
+    }
+  }
+  Serial.print('\n');
 }
 
 // discards a specific number of bytes from the serial buffer.
@@ -47,35 +56,40 @@ void discardSerialBytesUntil(char terminator) {
 void discardNSerialBytes(usize length) {
   while (length--) {
     // block until the buffer has some bytes to read
-    while (!Serial.available())
+    while (!Serial2.available())
       ;
-    Serial.read();
+    Serial2.read();
   }
 }
 
 void configLora() {
   debug(">[DEBUG] sending lora configs...\n");
 
-  Serial.write("AT+LOG=QUIET\n", 13);
-  discardNSerialBytes('\n');
+  Serial2.write("AT+LOG=QUIET\n", 13);
+  discardSerialBytesUntil('\n');
 
-  Serial.write("AT+UART=BR, 230400\n", 19);
-  discardNSerialBytes('\n');
+  Serial2.write("AT+UART=BR, 230400\n", 19);
+  discardSerialBytesUntil('\n');
 
-  Serial.write("AT+MODE=TEST\n", 13);
-  discardNSerialBytes('\n');
+  Serial2.write("AT+MODE=TEST\n", 13);
+  discardSerialBytesUntil('\n');
 
-  Serial.write("AT+TEST=RFCFG,868,SF7,250,12,15,14,ON,OFF,OFF\n", 46);
-  discardNSerialBytes('\n');
+  Serial2.write("AT+TEST=RFCFG,868,SF7,250,12,15,14,ON,OFF,OFF\n", 46);
+  discardSerialBytesUntil('\n');
 
   debug("<[DEBUG] done sending lora configs\n");
 }
 
+void sendAsHex(const u8 *data, usize len) {
+  for (usize i = 0; i < len; ++i)
+    Serial2.printf("%02X", data[i]);
+}
+
 // writes `AT+TEST=TXLRPKT, "<DATA>"\n` to serial as bytes
 void sendPacket(const u8 *data, usize len) {
-  Serial.write("AT+TEST=TXLRPKT, \"", 18);
-  Serial.write(data, len);
-  Serial.write("\"\n", 2);
+  Serial2.write("AT+TEST=TXLRPKT, \"", 18);
+  sendAsHex(data, len);
+  Serial2.write("\"\n", 2);
 
   // discard confirmation message received from AT commands (two lines)
   discardSerialBytesUntil('\n');
@@ -160,10 +174,10 @@ void transmitImageChunks(u16 n_chunks) {
 // reads from Serial the sequence numbers of missed chunks
 // and retransmits the bytes of the missed chunks
 void retransmitMissedChunks() {
-  Serial.setTimeout(RETRANSMISSION_TIMEOUT);
+  Serial2.setTimeout(RETRANSMISSION_TIMEOUT);
 
   // enable receive mode to receive sequence numbers of missed chunks
-  Serial.write("AT+TEST=RXLRPKT\n", 16);
+  Serial2.write("AT+TEST=RXLRPKT\n", 16);
   // discard confirmation message received from AT commands
   discardSerialBytesUntil('\n');
 
@@ -181,11 +195,11 @@ void retransmitMissedChunks() {
   // where <N_MISSED_CHUNKS> and <SEQ_i> are 2 bytes each.
 
   // discard the four bytes of the "MISS" literal
-  discardNSerialBytes(4);
+  discardNSerialBytes(8);
 
   // read and parse the two bytes of <N_MISSED_CHUNKS>.
   // note that ther protocol uses big endian.
-  u16 n_missed_chunks = (Serial.read() << 8) | Serial.read();
+  u16 n_missed_chunks = (Serial2.read() << 8) | Serial2.read();
 
   debug("[DEBUG] Number of missed chunks: %hu", n_missed_chunks);
 
@@ -199,7 +213,7 @@ void retransmitMissedChunks() {
   u8 *buffer = (u8 *)malloc(2 * n_missed_chunks);
 
   // read the sequence numbers of the missed chunks
-  Serial.readBytes(buffer, 2 * n_missed_chunks);
+  Serial2.readBytes(buffer, 2 * n_missed_chunks);
 
   // TODO: understand why we need this delay, and whether it should be inside
   // the loop
@@ -221,7 +235,7 @@ void retransmitMissedChunks() {
   }
 
   // switch Serial timeout back to default value
-  Serial.setTimeout(1000);
+  Serial2.setTimeout(1000);
 }
 
 void transmitImage() {
@@ -239,7 +253,10 @@ void transmitImage() {
 }
 
 void setup() {
-  Serial.begin(115200); // TODO: this might need to be 230400
+
+  Serial.begin(115200);
+  Serial2.begin(230400, SERIAL_8N1, 16, 17);
+
   configLora();
   transmitImage();
 }

@@ -15,6 +15,8 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef size_t usize;
 
+#define SERIAL_8N1 1
+
 usize min(usize a, usize b) { return a < b ? a : b; }
 void delay(u32 milliseconds) {
   std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
@@ -27,6 +29,7 @@ void *mempcpy(void *dst, const void *src, size_t n) {
 class SerialClass {
 public:
   void begin(long baud) { printf("[DEBUG] Serial.begin(%lu)", baud); }
+  void begin(long baud, int, ...) { printf("[DEBUG] Serial.begin(%lu)", baud); }
   usize write(const u8 *bytes, usize length) {
     return SerialClass::write((const char *)bytes, length);
   }
@@ -64,7 +67,15 @@ public:
   void setTimeout(long milliseconds) {
     printf("[DEBUG] Serial.setTimeout(%lu)", milliseconds);
   }
-} Serial;
+  void print(char c) { printf("%c", c); }
+  size_t printf(const char *format, ...) {
+    va_list arg;
+    va_start(arg, format);
+    size_t ret = vprintf(format, arg);
+    va_end(arg);
+    return ret;
+  }
+} Serial, Serial2;
 
 void setup();
 void loop();
