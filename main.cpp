@@ -1,4 +1,6 @@
-// #define ARDUINO
+#include "fake_image.hpp"
+
+// #define MY_ESP
 #define DEBUG
 
 #ifdef DEBUG
@@ -7,11 +9,17 @@
 #define debug(...)
 #endif // DEBUG
 
-#ifdef ARDUINO
+#ifdef MY_ESP
 #include <Arduino.h> // TODO: try to remove this
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef size_t usize;
+
 #else
 #include "utils.h"
-#endif // ARDUINO ---
+#endif // MY_ESP ---
 
 // TODO: replace with real image
 #define IMAGE_WIDTH 3
@@ -124,7 +132,8 @@ void transmitSingleImageChunk(u16 chunk_seq_num) {
   // write <CHUNK_BYTES> to the buffer.
   // the last chunk might be slightly shorter than `CHUNK_SIZE`,
   // so `min` is used.
-  usize chunk_len = min(CHUNK_SIZE, N_IMAGE_BYTES - chunk_start_i);
+
+  usize chunk_len = min((usize)CHUNK_SIZE, N_IMAGE_BYTES - chunk_start_i);
   cursor = mempcpy(cursor, image_data + chunk_start_i, chunk_len);
 
   sendPacket(chunk, chunk_len + 2);
