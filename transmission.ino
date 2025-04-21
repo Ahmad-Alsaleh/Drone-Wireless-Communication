@@ -1,9 +1,15 @@
-// #define ARDUINO
-#include <Arduino.h>  // TODO: try to remove this
-#include <string.h>
-#include <Seeed_Arduino_SSCMA.h>
 
+#include <Arduino.h> // TODO: try to remove this
+#include <string.h>
+
+#define USE_FAKE
+
+#ifndef USE_FAKE
+#include <Seeed_Arduino_SSCMA.h>
 SSCMA AI;
+#else
+#include <fake_image.hpp>
+#endif
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -12,52 +18,47 @@ typedef size_t usize;
 
 #define DEBUG
 #ifdef DEBUG
-#define debug(...)  // Serial.printf(__VA_ARGS__)
+#define debug(...) // Serial.printf(__VA_ARGS__)
 #else
 #define debug(...)
-#endif  // DEBUG
+#endif // DEBUG
 
-// TODO: replace with real image
+#ifndef USE_FAKE
 #define IMAGE_WIDTH 640
 #define IMAGE_HEIGHT 480
 usize n_image_bytes = 0;
-
-
 char *image_data;
+#else
+#define IMAGE_WIDTH 3
+#define IMAGE_HEIGHT 2
+usize n_image_bytes = 764;
+#define FAKE_IMAGE
+const char image_data[N_IMAGE_BYTES] = {FAKE_IMAGE};
+#endif
 
 #define CHUNK_SIZE 200
 #define RETRANSMISSION_TIMEOUT 5000
 #define RX_SWITCH_DELAY 500
 
-
-usize min(usize a, usize b) {
+usize min(usize a, usize b)
+{
   return a < b ? a : b;
 }
 
-void logResponse(int timeout) {
-  unsigned long startTime = millis();
-  while (millis() - startTime < timeout) {  // 2-second timeout
-    if (Serial.available()) {
-      String response = Serial.readStringUntil('\n');  // Read response line
-      // Serial.println("Response: " + response);          // Print response to Monitor
-      break;
-    }
-  }
-}
-
-void configLora() {
+void configLora()
+{
   debug(">[DEBUG] sending lora configs...\n");
 
   // TODO: read after every write to discard confirmation msg
   Serial.write("AT+LOG=QUIET\n", 13);
-  logResponse(2000);
+  discardSerialBytesUntil('\n');
 
   Serial.write("AT+UART=BR, 115200\n", 19);
-  logResponse(2000);
+  discardSerialBytesUntil('\n');
   Serial.write("AT+MODE=TEST\n", 13);
-  logResponse(2000);
+  discardSerialBytesUntil('\n');
   Serial.write("AT+TEST=RFCFG,868,SF7,250,12,15,14,ON,OFF,OFF\n", 46);
-  logResponse(2000);
+  discardSerialBytesUntil('\n');
 
   debug("<[DEBUG] done sending lora configs\n");
 }
@@ -66,14 +67,18 @@ void configLora() {
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
-void discardSerialBytesUntil(char terminator) {
+void discardSerialBytesUntil(char terminator)
+{
   char c;
-  while (true) {
-    if (Serial.available()) {
+  while (true)
+  {
+    if (Serial.available())
+    {
       c = Serial.read();
       // Serial.print(c);  // Log the byte
 
-      if (c == terminator) {
+      if (c == terminator)
+      {
         break;
       }
     }
@@ -85,8 +90,10 @@ void discardSerialBytesUntil(char terminator) {
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
-void discardNSerialBytes(usize length) {
-  while (length--) {
+void discardNSerialBytes(usize length)
+{
+  while (length--)
+  {
     // block until the buffer has some bytes to read
     while (!Serial.available())
       ;
@@ -94,16 +101,17 @@ void discardNSerialBytes(usize length) {
   }
 }
 
-// writes `AT+TEST=TXLRPKT, "<DATA>"\n` to serial as bytes
-void sendPacket(const u8 *data, usize len) {
-  Serial.write("AT+TEST=TXLRPKT, \"", 18);
-  // Serial.write(data, len);
-  for (usize i = 0; i < len; i++) {
-    char hexByte[3];
-    sprintf(hexByte, "%02X", data[i]);  // Convert to uppercase hex
-    Serial.write(hexByte, 2);
-  }
+void sendAsHex(const u8 *data, usize len)
+{
+  for (usize i = 0; i < len; ++i)
+    Serial2.printf("%02X", data[i]);
+}
 
+// writes `AT+TEST=TXLRPKT, "<DATA>"\n` to serial as bytes
+void sendPacket(const u8 *data, usize len)
+{
+  Serial.write("AT+TEST=TXLRPKT, \"", 18);
+  sendAsHex(data, len);
   Serial.write("\"\n", 2);
 
   // discard confirmation message received from AT commands (two lines)
@@ -120,7 +128,8 @@ void sendPacket(const u8 *data, usize len) {
 // <N_BYTES_TO_SEND> is 4 bytes
 // <IMAGE_WIDTH> is 4 bytes
 // <IMAGE_HEIGHT> is 4 bytes
-void transmitHeader(u32 n_bytes_to_send) {
+void transmitHeader(u32 n_bytes_to_send)
+{
   // TODO: Adham is sending the header 3 times in a row, do i need to do this?
 
   debug(">[DEBUG] transmitting header...\n");
@@ -151,7 +160,8 @@ void transmitHeader(u32 n_bytes_to_send) {
 // transmits a single chunk in the following format:
 // `<CHUNK_SEQ_NUM><CHUNK_BYTES>` where <CHUNK_SEQ_NUM> is 2 bytes
 // and <CHUNK_BYTES> is `CHUNK_SIZE` bytes (or maybe less for the last chunk)
-void transmitSingleImageChunk(u16 chunk_seq_num) {
+void transmitSingleImageChunk(u16 chunk_seq_num)
+{
   debug(">[DEBUG] transmitting image chunk with seq #%hu...\n", chunk_seq_num);
 
   u8 chunk[CHUNK_SIZE + 2];
@@ -172,14 +182,16 @@ void transmitSingleImageChunk(u16 chunk_seq_num) {
 
   sendPacket(chunk, chunk_len + 2);
 
-  debug("<[DEBUG] done transmitting image chunk\n");
+  debug(">[DEBUG] done transmitting image chunk\n");
 }
 
 // transmits the image as chunks
-void transmitImageChunks(u16 n_chunks) {
+void transmitImageChunks(u16 n_chunks)
+{
   debug(">[DEBUG] transmitting image chunks (%hu chunk/s)...\n", n_chunks);
 
-  for (u16 chunk_i = 0; chunk_i < n_chunks; ++chunk_i) {
+  for (u16 chunk_i = 0; chunk_i < n_chunks; ++chunk_i)
+  {
     if (chunk_i == 2)
       continue;
     transmitSingleImageChunk(chunk_i);
@@ -188,18 +200,21 @@ void transmitImageChunks(u16 n_chunks) {
   debug("[>DEBUG] done transmitting image chunks\n");
 }
 
-char unhex(char *hexbyte) {
+char unhex(char *hexbyte)
+{
   char c;
   sscanf(hexbyte, "%2x", &c);
   return c;
 }
 
-int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLength) {
+int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLength)
+{
   int bytesConverted = 0;
 
   unsigned int value;
   // Process two hex characters at a time
-  for (size_t i = 0; i < hexLength; i += 2) {
+  for (size_t i = 0; i < hexLength; i += 2)
+  {
     sscanf(&hexString[i], "%2x", &value);
     byteArray[bytesConverted++] = (u8)value;
   }
@@ -208,82 +223,8 @@ int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLengt
 
 // reads from Serial the sequence numbers of missed chunks
 // and retransmits the bytes of the missed chunks
-// int retransmitMissedChunks() {
-//   Serial.setTimeout(RETRANSMISSION_TIMEOUT);
-
-//   // enable receive mode to receive sequence numbers of missed chunks
-//   Serial.write("AT+TEST=RXLRPKT\n", 16);
-//   // discard confirmation message received from AT commands
-//   discardSerialBytesUntil('\n');
-
-//   // the AT message received has the form:
-//   // +TEST: LEN:<LEN>, RSSI:<RSSI>, SNR:<SNR>\r\n
-//   // +TEST: RX "<PAYLOAD>"\r\n
-
-//   // we are interested in the payload after the first `"` in the second line.
-//   // discard the first line and the bytes before the <PAYLOAD>.
-//   discardSerialBytesUntil('\n');
-//   discardSerialBytesUntil('"');
-
-//   // the payload received has the form:
-//   // `MISS<N_MISSED_CHUNKS><SEQ_1><SEQ_2>...<SEQ_N>`
-//   // where <N_MISSED_CHUNKS> and <SEQ_i> are 2 bytes each.
-
-//   // discard the four bytes of the "MISS" literal
-
-//   // discardNSerialBytes(4);
-//   char hexBuffer[8];
-//   Serial.readBytes(hexBuffer, 8);
-
-//   char byteArray[4];  // Will hold converted bytes
-
-//   hexStringToByteArray(hexBuffer, byteArray, 8);
-//   if (strncmp("MISS", byteArray, 4) != 0)
-//     return -1;
-
-//   // read and parse the two bytes of <N_MISSED_CHUNKS>.
-//   // note that ther protocol uses big endian.
-//   u16 n_missed_chunks = (Serial.read() << 8) | Serial.read();
-
-//   debug("[DEBUG] Number of missed chunks: %hu", n_missed_chunks);
-
-//   // TODO: instead of malloc, we can use a static array of
-//   // size, say, 256 bytes here since according to @Yousef an
-//   // image is at most 15KB which is 15000 / 200 = 75 chunks.
-//   // Thus 256 bytes should more than enough
-
-//   // the received payload has `n_missed_chunks` sequence numbers
-//   // and each sequence number is 2 bytes.
-//   u8 *buffer = (u8 *)malloc(2 * n_missed_chunks);
-
-//   // read the sequence numbers of the missed chunks
-//   Serial.readBytes(buffer, 2 * n_missed_chunks);
-
-//   // TODO: understand why we need this delay, and whether it should be inside
-//   // the loop
-
-//   // waiting before sending missed chunks
-//   delay(RX_SWITCH_DELAY);
-
-//   // retransmit the missed chunks
-//   for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks;
-//        ++missed_chunk_i) {
-
-//     u16 chunk_seq_num =
-//       (buffer[2 * missed_chunk_i] << 8) | buffer[2 * missed_chunk_i + 1];
-
-//     debug("[DEBUG] Transmitting missed chunk #%hu/%hu: Seq #%hu\n",
-//           missed_chunk_i, n_missed_chunks, chunk_seq_num);
-
-//     transmitSingleImageChunk(chunk_seq_num);
-//   }
-
-//   // switch Serial timeout back to default value
-//   Serial.setTimeout(1000);
-// }
-
-
-void retransmitMissedChunks() {
+void retransmitMissedChunks()
+{
   Serial.setTimeout(RETRANSMISSION_TIMEOUT);
 
   // enable receive mode to receive sequence numbers of missed chunks
@@ -345,12 +286,12 @@ void retransmitMissedChunks() {
   delay(RX_SWITCH_DELAY);
 
   // retransmit the missed chunks
-  for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks; ++missed_chunk_i) {
-    digitalWrite(1, HIGH);
+  for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks; ++missed_chunk_i)
+  {
     u8 *first_byte = buffer + 4 * missed_chunk_i;
 
     u16 chunk_seq_num =
-      (unhex((char *)first_byte) << 8) | unhex((char *)first_byte + 2);
+        (unhex((char *)first_byte) << 8) | unhex((char *)first_byte + 2);
 
     debug("[DEBUG] Transmitting missed chunk #%hu/%hu: Seq #%hu\n",
           missed_chunk_i, n_missed_chunks, chunk_seq_num);
@@ -364,10 +305,12 @@ void retransmitMissedChunks() {
   free(buffer);
 }
 
-void transmitImage() {
+void transmitImage()
+{
   // manually implement the ceil function
   u16 n_chunks = n_image_bytes / CHUNK_SIZE;
-  if (n_image_bytes != n_chunks * CHUNK_SIZE) {
+  if (n_image_bytes != n_chunks * CHUNK_SIZE)
+  {
     ++n_chunks;
   }
 
@@ -378,33 +321,34 @@ void transmitImage() {
   retransmitMissedChunks();
 }
 
-
-void setup() {
+void setup()
+{
   AI.begin();
   pinMode(1, OUTPUT);
 
-  //Serial.begin(115200);  // TODO: this might need to be 230400
-  Serial.begin(115200);  //, SERIAL_8N1, 16, 17);
+  // Serial.begin(115200);  // TODO: this might need to be 230400
+  Serial.begin(115200); //, SERIAL_8N1, 16, 17);
   configLora();
 
-  delay(1000);
-
-  if (!AI.invoke(1, false, true)) {
-    // Serial.println("INVOKED");
-    if (AI.last_image().length() > 0) {
+#ifdef USE_FAKE
+  transmitImage();
+#else
+  delay(500);
+  if (!AI.invoke(1, false, true))
+  {
+    if (AI.last_image().length() > 0)
+    {
       String img = AI.last_image();
       image_data = (char *)img.c_str();
       n_image_bytes = img.length();
-
-
-      delay(1000);
+      delay(500);
       transmitImage();
     }
-  } else {
-    // Serial.println("FAILED TO INVOKE");
   }
+#endif
 }
 
-void loop() {
+void loop()
+{
   // nothing to do here
 }
