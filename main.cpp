@@ -171,6 +171,15 @@ void transmitImageChunks(u16 n_chunks) {
   debug("<[DEBUG] done transmitting image chunks\n");
 }
 
+// converts the first two chars in `hexbyte` into a hex number
+// e.g.: if `hexbytes` holds '3F41A4', the function will return
+// the number 0x3F
+u8 unhex(const char *hexbyte) {
+  int c;
+  sscanf(hexbyte, "%2Xc", &c);
+  return c;
+}
+
 // reads from Serial the sequence numbers of missed chunks
 // and retransmits the bytes of the missed chunks
 void retransmitMissedChunks() {
@@ -195,13 +204,24 @@ void retransmitMissedChunks() {
   // where <N_MISSED_CHUNKS> and <SEQ_i> are 2 bytes each.
 
   // discard the four bytes of the "MISS" literal
+  // note that every byte is sent as two ASCII chars
   discardNSerialBytes(8);
 
   // read and parse the two bytes of <N_MISSED_CHUNKS>.
-  // note that ther protocol uses big endian.
-  u16 n_missed_chunks = (Serial2.read() << 8) | Serial2.read();
+  // note that every byte is represented as two bytes
+  // eg: the byte 0xA4 is sent as two ASCII bytes ['A', '4']
+  char higher_bytes[2];
+  Serial2.readBytes(higher_bytes, 2);
 
-  debug("[DEBUG] Number of missed chunks: %hu", n_missed_chunks);
+  char lower_bytes[2];
+  Serial2.readBytes(lower_bytes, 2);
+
+  u16 n_missed_chunks = (unhex(higher_bytes) << 8) | unhex(lower_bytes);
+
+  debug("[DEBUG] Number of missed chunks: %hu\n", n_missed_chunks);
+
+  if (n_missed_chunks == 0)
+    return;
 
   // TODO: instead of malloc, we can use a static array of
   // size, say, 256 bytes here since according to @Yousef an
@@ -209,11 +229,13 @@ void retransmitMissedChunks() {
   // Thus 256 bytes should more than enough
 
   // the received payload has `n_missed_chunks` sequence numbers
-  // and each sequence number is 2 bytes.
-  u8 *buffer = (u8 *)malloc(2 * n_missed_chunks);
+  // and each sequence number is 2 bytes and every byte is represented
+  // as two ASCII bytes
+  u8 *buffer = (u8 *)malloc(2 * 2 * n_missed_chunks);
 
   // read the sequence numbers of the missed chunks
-  Serial2.readBytes(buffer, 2 * n_missed_chunks);
+  // note that every byte is two ASCII charachters
+  Serial2.readBytes(buffer, 2 * 2 * n_missed_chunks);
 
   // TODO: understand why we need this delay, and whether it should be inside
   // the loop
@@ -225,8 +247,10 @@ void retransmitMissedChunks() {
   for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks;
        ++missed_chunk_i) {
 
+    u8 *first_byte = buffer + 4 * missed_chunk_i;
+
     u16 chunk_seq_num =
-        (buffer[2 * missed_chunk_i] << 8) | buffer[2 * missed_chunk_i + 1];
+        (unhex((char *)first_byte) << 8) | unhex((char *)first_byte + 2);
 
     debug("[DEBUG] Transmitting missed chunk #%hu/%hu: Seq #%hu\n",
           missed_chunk_i, n_missed_chunks, chunk_seq_num);
@@ -236,6 +260,8 @@ void retransmitMissedChunks() {
 
   // switch Serial timeout back to default value
   Serial2.setTimeout(1000);
+
+  free(buffer);
 }
 
 void transmitImage() {
