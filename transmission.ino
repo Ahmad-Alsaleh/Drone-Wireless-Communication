@@ -53,7 +53,7 @@ void configLora()
   Serial.write("AT+LOG=QUIET\n", 13);
   discardSerialBytesUntil('\n');
 
-  Serial.write("AT+UART=BR, 115200\n", 19);
+  Serial.write("AT+UART=BR, 230400\n", 19);
   discardSerialBytesUntil('\n');
   Serial.write("AT+MODE=TEST\n", 13);
   discardSerialBytesUntil('\n');
@@ -327,7 +327,7 @@ void setup()
   pinMode(1, OUTPUT);
 
   // Serial.begin(115200);  // TODO: this might need to be 230400
-  Serial.begin(115200); //, SERIAL_8N1, 16, 17);
+  Serial.begin(230400); //, SERIAL_8N1, 16, 17);
   configLora();
 
 #ifdef USE_FAKE
