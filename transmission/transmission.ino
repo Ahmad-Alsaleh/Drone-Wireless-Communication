@@ -1,14 +1,14 @@
 
-#include <Arduino.h> // TODO: try to remove this
+#include <Arduino.h>  // TODO: try to remove this
 #include <string.h>
 
-#define USE_FAKE
+// #define USE_FAKE
 
-#ifndef USE_FAKE
+#ifdef USE_FAKE
+#include <fake_image.hpp>
+#else
 #include <Seeed_Arduino_SSCMA.h>
 SSCMA AI;
-#else
-#include <fake_image.hpp>
 #endif
 
 typedef uint8_t u8;
@@ -16,12 +16,15 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef size_t usize;
 
-#define DEBUG
+#define RED_LED 1
+#define BLUE_LED 2
+
+// #define DEBUG
 #ifdef DEBUG
-#define debug(...) // Serial.printf(__VA_ARGS__)
+#define debug(...)  // Serial.printf(__VA_ARGS__)
 #else
 #define debug(...)
-#endif // DEBUG
+#endif  // DEBUG
 
 #ifndef USE_FAKE
 #define IMAGE_WIDTH 640
@@ -33,20 +36,18 @@ char *image_data;
 #define IMAGE_HEIGHT 2
 usize n_image_bytes = 764;
 #define FAKE_IMAGE
-const char image_data[N_IMAGE_BYTES] = {FAKE_IMAGE};
+const char image_data[N_IMAGE_BYTES] = { FAKE_IMAGE };
 #endif
 
 #define CHUNK_SIZE 200
 #define RETRANSMISSION_TIMEOUT 5000
 #define RX_SWITCH_DELAY 500
 
-usize min(usize a, usize b)
-{
+usize min(usize a, usize b) {
   return a < b ? a : b;
 }
 
-void configLora()
-{
+void configLora() {
   debug(">[DEBUG] sending lora configs...\n");
 
   // TODO: read after every write to discard confirmation msg
@@ -67,18 +68,14 @@ void configLora()
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
-void discardSerialBytesUntil(char terminator)
-{
+void discardSerialBytesUntil(char terminator) {
   char c;
-  while (true)
-  {
-    if (Serial.available())
-    {
+  while (true) {
+    if (Serial.available()) {
       c = Serial.read();
       // Serial.print(c);  // Log the byte
 
-      if (c == terminator)
-      {
+      if (c == terminator) {
         break;
       }
     }
@@ -90,10 +87,8 @@ void discardSerialBytesUntil(char terminator)
 // Note that this function uses `Serial.read()` internally
 // which doesn't respect the Serial timeout value, the function
 // will block while the Serial buffer is empty.
-void discardNSerialBytes(usize length)
-{
-  while (length--)
-  {
+void discardNSerialBytes(usize length) {
+  while (length--) {
     // block until the buffer has some bytes to read
     while (!Serial.available())
       ;
@@ -101,15 +96,13 @@ void discardNSerialBytes(usize length)
   }
 }
 
-void sendAsHex(const u8 *data, usize len)
-{
+void sendAsHex(const u8 *data, usize len) {
   for (usize i = 0; i < len; ++i)
-    Serial2.printf("%02X", data[i]);
+    Serial.printf("%02X", data[i]);
 }
 
 // writes `AT+TEST=TXLRPKT, "<DATA>"\n` to serial as bytes
-void sendPacket(const u8 *data, usize len)
-{
+void sendPacket(const u8 *data, usize len) {
   Serial.write("AT+TEST=TXLRPKT, \"", 18);
   sendAsHex(data, len);
   Serial.write("\"\n", 2);
@@ -128,8 +121,7 @@ void sendPacket(const u8 *data, usize len)
 // <N_BYTES_TO_SEND> is 4 bytes
 // <IMAGE_WIDTH> is 4 bytes
 // <IMAGE_HEIGHT> is 4 bytes
-void transmitHeader(u32 n_bytes_to_send)
-{
+void transmitHeader(u32 n_bytes_to_send) {
   // TODO: Adham is sending the header 3 times in a row, do i need to do this?
 
   debug(">[DEBUG] transmitting header...\n");
@@ -160,8 +152,7 @@ void transmitHeader(u32 n_bytes_to_send)
 // transmits a single chunk in the following format:
 // `<CHUNK_SEQ_NUM><CHUNK_BYTES>` where <CHUNK_SEQ_NUM> is 2 bytes
 // and <CHUNK_BYTES> is `CHUNK_SIZE` bytes (or maybe less for the last chunk)
-void transmitSingleImageChunk(u16 chunk_seq_num)
-{
+void transmitSingleImageChunk(u16 chunk_seq_num) {
   debug(">[DEBUG] transmitting image chunk with seq #%hu...\n", chunk_seq_num);
 
   u8 chunk[CHUNK_SIZE + 2];
@@ -186,12 +177,10 @@ void transmitSingleImageChunk(u16 chunk_seq_num)
 }
 
 // transmits the image as chunks
-void transmitImageChunks(u16 n_chunks)
-{
+void transmitImageChunks(u16 n_chunks) {
   debug(">[DEBUG] transmitting image chunks (%hu chunk/s)...\n", n_chunks);
 
-  for (u16 chunk_i = 0; chunk_i < n_chunks; ++chunk_i)
-  {
+  for (u16 chunk_i = 0; chunk_i < n_chunks; ++chunk_i) {
     if (chunk_i == 2)
       continue;
     transmitSingleImageChunk(chunk_i);
@@ -200,21 +189,18 @@ void transmitImageChunks(u16 n_chunks)
   debug("[>DEBUG] done transmitting image chunks\n");
 }
 
-char unhex(char *hexbyte)
-{
+char unhex(char *hexbyte) {
   char c;
   sscanf(hexbyte, "%2x", &c);
   return c;
 }
 
-int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLength)
-{
+int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLength) {
   int bytesConverted = 0;
 
   unsigned int value;
   // Process two hex characters at a time
-  for (size_t i = 0; i < hexLength; i += 2)
-  {
+  for (size_t i = 0; i < hexLength; i += 2) {
     sscanf(&hexString[i], "%2x", &value);
     byteArray[bytesConverted++] = (u8)value;
   }
@@ -223,8 +209,7 @@ int hexStringToByteArray(const char *hexString, char *byteArray, size_t hexLengt
 
 // reads from Serial the sequence numbers of missed chunks
 // and retransmits the bytes of the missed chunks
-void retransmitMissedChunks()
-{
+void retransmitMissedChunks() {
   Serial.setTimeout(RETRANSMISSION_TIMEOUT);
 
   // enable receive mode to receive sequence numbers of missed chunks
@@ -286,12 +271,11 @@ void retransmitMissedChunks()
   delay(RX_SWITCH_DELAY);
 
   // retransmit the missed chunks
-  for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks; ++missed_chunk_i)
-  {
+  for (u16 missed_chunk_i = 0; missed_chunk_i < n_missed_chunks; ++missed_chunk_i) {
     u8 *first_byte = buffer + 4 * missed_chunk_i;
 
     u16 chunk_seq_num =
-        (unhex((char *)first_byte) << 8) | unhex((char *)first_byte + 2);
+      (unhex((char *)first_byte) << 8) | unhex((char *)first_byte + 2);
 
     debug("[DEBUG] Transmitting missed chunk #%hu/%hu: Seq #%hu\n",
           missed_chunk_i, n_missed_chunks, chunk_seq_num);
@@ -305,12 +289,10 @@ void retransmitMissedChunks()
   free(buffer);
 }
 
-void transmitImage()
-{
+void transmitImage() {
   // manually implement the ceil function
   u16 n_chunks = n_image_bytes / CHUNK_SIZE;
-  if (n_image_bytes != n_chunks * CHUNK_SIZE)
-  {
+  if (n_image_bytes != n_chunks * CHUNK_SIZE) {
     ++n_chunks;
   }
 
@@ -321,23 +303,38 @@ void transmitImage()
   retransmitMissedChunks();
 }
 
-void setup()
-{
+void blink(int pin, int duration) {
+  digitalWrite(pin, HIGH);
+  delay(duration);
+  digitalWrite(pin, LOW);
+  delay(duration);
+}
+
+void setup() {
   AI.begin();
-  pinMode(1, OUTPUT);
+
+  // discard the first few images to warm up the camera and fix exposure issues
+  delay(500);
+  AI.invoke(1, false, true);
+
+  pinMode(RED_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+
+  for (int i = 0; i < 3; ++i) {
+    blink(RED_LED, 10);
+    blink(BLUE_LED, 10);
+  }
 
   // Serial.begin(115200);  // TODO: this might need to be 230400
-  Serial.begin(230400); //, SERIAL_8N1, 16, 17);
+  Serial.begin(230400);  //, SERIAL_8N1, 16, 17);
   configLora();
 
 #ifdef USE_FAKE
   transmitImage();
 #else
   delay(500);
-  if (!AI.invoke(1, false, true))
-  {
-    if (AI.last_image().length() > 0)
-    {
+  if (!AI.invoke(1, false, true)) {
+    if (AI.last_image().length() > 0) {
       String img = AI.last_image();
       image_data = (char *)img.c_str();
       n_image_bytes = img.length();
@@ -348,7 +345,6 @@ void setup()
 #endif
 }
 
-void loop()
-{
+void loop() {
   // nothing to do here
 }
